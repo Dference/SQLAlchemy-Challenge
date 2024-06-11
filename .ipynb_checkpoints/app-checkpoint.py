@@ -3,6 +3,11 @@ from flask import Flask, jsonify
 from sqlalchemy import create_engine, func
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
+import numpy as np
+import pandas as pd
+from datetime import datetime, timedelta
+import datetime as dt
+import json
 
 #################################################
 # Database Setup
@@ -35,6 +40,48 @@ app = Flask(__name__)
 # Flask Routes
 #################################################
 
+# Define a route for the home page
+@app.route("/")
+def welcome():
+    """List all available routes."""
+    return (
+        f"Available Routes:<br/>"
+        f"/api/v1.0/precipitation - Precipitation observations for the last year<br/>"
+        f"/api/v1.0/stations - List of stations<br/>"
+        f"/api/v1.0/tobs - List of temperature observations for the last year<br/>"
+        f"/api/v1.0/start_date - Minimum, average, and maximum temperatures for all dates after the start date<br/>"
+        f"/api/v1.0/start_date/end_date - Minimum, average, and maximum temperatures for all dates between the start and end dates<br/>")
+
+# Define a route to retrieve the results of the precipitation query
+@app.route("/api/v1.0/precipitation")
+def precipitation():
+    """Return JSON results of precipitation query"""
+
+    # Starting from the most recent data point in the database. 
+    most_recent_date = dt.datetime(2017, 8, 23)
+
+    # Calculate the date one year from the last date in data set.
+    one_year_ago = (most_recent_date - timedelta(days=365)).strftime('%Y-%m-%d')
+    one_year_ago
+
+    # Perform a query to retrieve the data and precipitation scores
+    precipitation_data = session.query(Measurement.date, Measurement.prcp).\
+    filter(Measurement.date >= one_year_ago).\
+    filter(Measurement.date <= most_recent_date).all()
+
+   # Convert the results into a dictionary
+    precipitation_dict = {}
+
+    # Read through the precipitation data and create the dictionary
+    for date, prcp in precipitation_data:
+        precipitation_dict[date] = prcp
+
+    # Convert the dictionary to JSON format
+    precipitation_json = json.dumps(precipitation_dict)
+
+    # Now you can return `precipitation_json` wherever you need it
+    return jsonify(precipitation_json)
+
 # Define a route to retrieve the list of stations
 @app.route("/api/v1.0/stations")
 def stations():
@@ -50,8 +97,8 @@ def stations():
 @app.route("/api/v1.0/tobs")
 def tobs():
     """Return a JSON list of temperature observations for the last year."""
-    # Query the most recent date in the database
-    most_recent_date = session.query(func.max(Measurement.date)).first()
+  # Starting from the most recent data point in the database. 
+    most_recent_date = dt.datetime(2017, 8, 23)
     # Find the date one year ago
     one_year_ago = (most_recent_date - timedelta(days=365)).strftime('%Y-%m-%d')
     # Query temperature observations for the last year
@@ -104,18 +151,6 @@ def calc_temps_start_end(start, end):
         temps_data.append(temps_dict)
     # Return the list as JSON
     return jsonify(temps_data)
-
-# Define a route for the home page
-@app.route("/")
-def welcome():
-    """List all available routes."""
-    return (
-        f"Available Routes:<br/>"
-        f"/api/v1.0/stations - List of stations<br/>"
-        f"/api/v1.0/tobs - List of temperature observations for the last year<br/>"
-        f"/api/v1.0/start_date - Minimum, average, and maximum temperatures for all dates after the start date<br/>"
-        f"/api/v1.0/start_date/end_date - Minimum, average, and maximum temperatures for all dates between the start and end dates<br/>"
-    )
 
 if __name__ == "__main__":
     app.run(debug=True)
